@@ -1,0 +1,8 @@
+{
+  "name": "RetroCruit AI Interviewer",
+  "description": "RetroCruit is an AI-powered mock interviewer that leverages Gemini API to provide conversational, technical, and skill-based interview practice. It offers real-time audio conversations, image analysis, and dynamic question generation.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
