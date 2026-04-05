@@ -86,6 +86,8 @@ const SkillCheckInterviewPage: React.FC = () => {
   const [technicalAnswerInput, setTechnicalAnswerInput] = useState<string>(''); // For technical phase textarea
   const [selectedLanguage, setSelectedLanguage] = useState<string>('JavaScript'); // New state for selected language
 
+  const [activeInputTranscription, setActiveInputTranscription] = useState<string>('');
+  const [activeOutputTranscription, setActiveOutputTranscription] = useState<string>('');
   const currentInputTranscription = useRef<string>('');
   const currentOutputTranscription = useRef<string>('');
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -222,34 +224,38 @@ const SkillCheckInterviewPage: React.FC = () => {
           setTranscriptions((prev) => [...prev, { role: 'model', text: firstQuestion }]);
           // Send the first question to the live session as input for the AI to process.
           if (liveSessionRef.current) {
-            liveSessionRef.current.sendRealtimeInput({ media: { data: btoa(firstQuestion), mimeType: 'text/plain' } });
+            liveSessionRef.current.sendRealtimeInput({ text: firstQuestion });
           }
         },
         onmessage: async (message) => {
-          // Handle audio output and transcription updates
-          // Audio output is handled by geminiService.ts -> connectToLiveSession
-          // Transcription is updated in refs, then state for UI below.
-
           if (message.serverContent?.outputTranscription) {
-            currentOutputTranscription.current += message.serverContent.outputTranscription.text;
+            const text = message.serverContent.outputTranscription.text;
+            currentOutputTranscription.current += text;
+            setActiveOutputTranscription(currentOutputTranscription.current);
           } else if (message.serverContent?.inputTranscription) {
-            currentInputTranscription.current += message.serverContent.inputTranscription.text;
+            const text = message.serverContent.inputTranscription.text;
+            currentInputTranscription.current += text;
+            setActiveInputTranscription(currentInputTranscription.current);
           }
 
           if (message.serverContent?.turnComplete) {
             const userText = currentInputTranscription.current.trim();
             const modelText = currentOutputTranscription.current.trim();
 
-            if (userText) {
-              setTranscriptions((prev) => [...prev, { role: 'user', text: userText }]);
-            }
-            if (modelText) {
-              setTranscriptions((prev) => [...prev, { role: 'model', text: modelText }]);
+            if (userText || modelText) {
+              setTranscriptions((prev) => {
+                const newTranscriptions = [...prev];
+                if (userText) newTranscriptions.push({ role: 'user', text: userText });
+                if (modelText) newTranscriptions.push({ role: 'model', text: modelText });
+                return newTranscriptions;
+              });
             }
 
             // Clear current turn transcriptions
             currentInputTranscription.current = '';
             currentOutputTranscription.current = '';
+            setActiveInputTranscription('');
+            setActiveOutputTranscription('');
 
             // Conversational Phase Logic
             if (interviewPhaseRef.current === 'conversational') {
@@ -260,7 +266,7 @@ const SkillCheckInterviewPage: React.FC = () => {
                     const nextQuestion = CONVERSATIONAL_QUESTIONS[nextQuestionIndex].text;
                     setTranscriptions((prev) => [...prev, { role: 'model', text: nextQuestion }]);
                     if (liveSessionRef.current) { // Use the stored session to send next input
-                       liveSessionRef.current.sendRealtimeInput({ media: { data: btoa(nextQuestion), mimeType: 'text/plain' } });
+                       liveSessionRef.current.sendRealtimeInput({ text: nextQuestion });
                     }
                 } else {
                     // All conversational questions asked, transition to technical phase
@@ -506,18 +512,18 @@ const SkillCheckInterviewPage: React.FC = () => {
                     </span>
                   </div>
                 ))}
-                {isMicActive && currentInputTranscription.current && (
+                {isMicActive && activeInputTranscription && (
                   <div className="p-3 rounded-lg shadow-md max-w-[80%] bg-blue-700/50 self-end ml-auto">
                     <span className="text-blue-100">
-                      {currentInputTranscription.current}
+                      {activeInputTranscription}
                       <span className="inline-block w-1 h-4 bg-blue-100 animate-pulse ml-1"></span>
                     </span>
                   </div>
                 )}
-                {isMicActive && currentOutputTranscription.current && (
+                {isMicActive && activeOutputTranscription && (
                   <div className="p-3 rounded-lg shadow-md max-w-[80%] bg-emerald-700/50 self-start mr-auto">
                     <span className="text-emerald-100">
-                      {currentOutputTranscription.current}
+                      {activeOutputTranscription}
                       <span className="inline-block w-1 h-4 bg-emerald-100 animate-pulse ml-1"></span>
                     </span>
                   </div>

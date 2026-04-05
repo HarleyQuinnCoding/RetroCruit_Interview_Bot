@@ -1,12 +1,12 @@
 
-export const API_KEY = process.env.API_KEY;
+export const API_KEY = process.env.GEMINI_API_KEY;
 
-export const GEMINI_MODEL_TEXT_FLASH = 'gemini-2.5-flash';
-export const GEMINI_MODEL_TEXT_FLASH_LITE = 'gemini-flash-lite-latest';
-export const GEMINI_MODEL_TEXT_PRO = 'gemini-2.5-pro';
+export const GEMINI_MODEL_TEXT_FLASH = 'gemini-3-flash-preview';
+export const GEMINI_MODEL_TEXT_FLASH_LITE = 'gemini-3.1-flash-lite-preview';
+export const GEMINI_MODEL_TEXT_PRO = 'gemini-3.1-pro-preview';
 export const GEMINI_MODEL_IMAGE_FLASH = 'gemini-2.5-flash-image';
 export const GEMINI_MODEL_TTS = 'gemini-2.5-flash-preview-tts';
-export const GEMINI_MODEL_LIVE_AUDIO = 'gemini-2.5-flash-native-audio-preview-09-2025';
+export const GEMINI_MODEL_LIVE_AUDIO = 'gemini-3.1-flash-live-preview';
 
 // Audio settings for Live API
 export const INPUT_AUDIO_SAMPLE_RATE = 16000; // Microphone input

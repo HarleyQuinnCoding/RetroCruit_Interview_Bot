@@ -1,5 +1,5 @@
 
-import { GoogleGenAI, GenerateContentResponse, Chat, Modality, FunctionDeclaration, Type } from "@google/genai";
+import { GoogleGenAI, GenerateContentResponse, Chat, Modality, FunctionDeclaration, Type, ThinkingLevel } from "@google/genai";
 import { API_KEY, GEMINI_MODEL_TEXT_FLASH, GEMINI_MODEL_IMAGE_FLASH, GEMINI_MODEL_LIVE_AUDIO, GEMINI_MODEL_TTS, INPUT_AUDIO_SAMPLE_RATE, OUTPUT_AUDIO_SAMPLE_RATE, AUDIO_CHANNELS, LIVE_API_VOICE_NAME, GEMINI_MODEL_TEXT_PRO, AUDIO_CHUNK_SIZE, TTS_VOICE_NAME } from '../constants'; // Import TTS_VOICE_NAME
 import { LiveSessionCallbacks, ChatMessage, ToolCall } from '../types'; // Removed Blob from types as it's not directly used here.
 
@@ -93,7 +93,7 @@ export const generateText = async (prompt: string, model: string = GEMINI_MODEL_
       model: model,
       contents: prompt,
       config: {
-        thinkingConfig: { thinkingBudget: 0 }, // For faster responses
+        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW }, // For faster responses
       },
     });
     return response;
@@ -127,12 +127,21 @@ export const generateTextStream = async (prompt: string, model: string = GEMINI_
 };
 
 
-export const analyzeResume = async (resumeContent: string, prompt: string): Promise<GenerateContentResponse> => { // Renamed from analyzeImage
+export const analyzeResume = async (resumeContent: string | { data: string, mimeType: string }, prompt: string): Promise<GenerateContentResponse> => {
   const client = await getGeminiClient();
   try {
+    let contents: any;
+    if (typeof resumeContent === 'string') {
+      contents = [{ text: `${prompt}\n\nResume Content:\n${resumeContent}` }];
+    } else {
+      contents = [
+        { text: prompt },
+        { inlineData: { data: resumeContent.data, mimeType: resumeContent.mimeType } }
+      ];
+    }
     const response = await client.models.generateContent({
       model: GEMINI_MODEL_TEXT_PRO, // Using a text-focused model for analysis
-      contents: [{ text: `${prompt}\n\nResume Content:\n${resumeContent}` }], // Pass content as text
+      contents,
     });
     return response;
   } catch (error: any) {
@@ -335,7 +344,7 @@ export const startAudioInput = async (stream: MediaStream) => {
       mimeType: `audio/pcm;rate=${INPUT_AUDIO_SAMPLE_RATE}`,
     };
     liveSessionPromise?.then((session) => {
-      session.sendRealtimeInput({ media: pcmBlob });
+      session.sendRealtimeInput({ audio: pcmBlob });
     }).catch(e => console.error("Error sending realtime input:", e));
   };
 
@@ -393,11 +402,11 @@ export const sendToolResponseToLiveSession = async (
   try {
     const session = await liveSessionPromise;
     session.sendToolResponse({
-      functionResponses: {
+      functionResponses: [{
         id: functionCallId,
         name: functionName,
         response: { result: result },
-      }
+      }]
     });
     console.log(`Sent tool response for ${functionName} (ID: ${functionCallId})`);
   } catch (error) {

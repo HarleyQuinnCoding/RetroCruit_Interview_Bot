@@ -7,6 +7,7 @@ import { GEMINI_MODEL_TEXT_PRO } from '../constants'; // Using text model for re
 const ResumeAnalyzer: React.FC = () => { // Renamed component
   const navigate = useNavigate();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [resumeBinary, setResumeBinary] = useState<{ data: string, mimeType: string } | null>(null);
   const [resumeContent, setResumeContent] = useState<string | null>(null); // To store extracted text
   const [jobDescription, setJobDescription] = useState<string>(''); // New state for job description
   const [analysisResult, setAnalysisResult] = useState<string | null>(null);
@@ -19,27 +20,26 @@ const ResumeAnalyzer: React.FC = () => { // Renamed component
       setSelectedFile(file);
       setAnalysisResult(null); // Clear previous analysis
       setResumeContent(null); // Clear previous resume content
+      setResumeBinary(null);
 
       const reader = new FileReader();
       reader.onloadend = async () => {
-        const fileData = reader.result;
-        if (file.type === 'application/pdf') {
-          // Placeholder for PDF parsing logic (requires external library, e.g., pdf.js)
-          // For now, we'll just indicate it's a PDF and assume text extraction in a real app.
-          setResumeContent(`PDF file uploaded`);
-          console.warn("PDF parsing is not implemented in this demo. For a full solution, integrate a PDF parsing library.");
-        } else if (file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || file.type === 'application/msword') {
-          // Placeholder for DOCX/DOC parsing (requires external library)
-          setResumeContent(`(Word document uploaded: ${file.name}. In a real application, Word content would be extracted here.)`);
-          console.warn("Word document parsing is not implemented in this demo. For a full solution, integrate a DOCX/DOC parsing library.");
-        } else if (file.type === 'text/plain') {
-          setResumeContent(fileData as string);
+        const result = reader.result as string;
+        if (file.type === 'text/plain') {
+          setResumeContent(result);
+          setResumeBinary(null);
         } else {
-          setResumeContent(`(Unsupported file type uploaded: ${file.name}. Please upload PDF, DOCX, DOC, or TXT.)`);
+          const base64Data = result.split(',')[1];
+          setResumeBinary({ data: base64Data, mimeType: file.type });
+          setResumeContent(`[Binary file: ${file.name}]`);
         }
       };
-      // Read as text for simplicity, for actual parsing, you'd handle Blob or ArrayBuffer
-      reader.readAsText(file); // Try to read as text directly for TXT files
+      
+      if (file.type === 'text/plain') {
+        reader.readAsText(file);
+      } else {
+        reader.readAsDataURL(file);
+      }
     }
   };
 
@@ -75,15 +75,10 @@ const ResumeAnalyzer: React.FC = () => { // Renamed component
         fullPrompt += ` (No job description provided, providing general resume feedback.)`;
       }
 
-      fullPrompt += `
-        Resume Content:
-        \`\`\`
-        ${resumeContent}
-        \`\`\`
+      fullPrompt += ` Format your response professionally with clear headings.`;
 
-        Format your response professionally with clear headings.`;
-
-      const response = await analyzeResume(resumeContent, fullPrompt); // Updated function call
+      const contentToAnalyze = resumeBinary || resumeContent;
+      const response = await analyzeResume(contentToAnalyze, fullPrompt); 
       setAnalysisResult(response.text);
     } catch (error) {
       console.error("Error during resume analysis:", error);
@@ -167,7 +162,7 @@ const ResumeAnalyzer: React.FC = () => { // Renamed component
 
         <HolographicButton
           onClick={handleAnalyzeResume}
-          disabled={isLoading || !resumeContent || resumeContent.startsWith('(Unsupported')} // Removed !jobDescription.trim() from here
+          disabled={isLoading || !resumeContent} // Removed !jobDescription.trim() from here
           size="default" // Use default size for primary action button
           aria-label="Analyze Resume"
         >

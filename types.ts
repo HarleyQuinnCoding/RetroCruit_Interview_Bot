@@ -4,14 +4,14 @@ import { LiveServerMessage, Blob, Modality } from "@google/genai";
 
 // The `window.aistudio` object is assumed to be pre-configured and globally available
 // by the AI Studio environment, hence no explicit declaration is needed here.
-// declare global {
-//   interface Window {
-//     aistudio: {
-//       hasSelectedApiKey: () => Promise<boolean>;
-//       openSelectKey: () => Promise<void>;
-//     };
-//   }
-// }
+declare global {
+  interface Window {
+    aistudio: {
+      hasSelectedApiKey: () => Promise<boolean>;
+      openSelectKey: () => Promise<void>;
+    };
+  }
+}
 
 export interface ChatMessage {
   role: 'user' | 'model';

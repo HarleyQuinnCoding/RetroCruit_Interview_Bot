@@ -35,7 +35,10 @@ const ConversationalInterview: React.FC = () => {
   const [isMicActive, setIsMicActive] = useState(false);
   const [transcriptions, setTranscriptions] = useState<ChatMessage[]>([]);
   const [apiKeyPromptVisible, setApiKeyPromptVisible] = useState(false);
+  const liveSessionRef = useRef<any>(null);
 
+  const [activeInputTranscription, setActiveInputTranscription] = useState<string>('');
+  const [activeOutputTranscription, setActiveOutputTranscription] = useState<string>('');
   const currentInputTranscription = useRef<string>('');
   const currentOutputTranscription = useRef<string>('');
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -63,24 +66,32 @@ const ConversationalInterview: React.FC = () => {
         },
         onmessage: async (message) => {
           if (message.serverContent?.outputTranscription) {
-            currentOutputTranscription.current += message.serverContent.outputTranscription.text;
+            const text = message.serverContent.outputTranscription.text;
+            currentOutputTranscription.current += text;
+            setActiveOutputTranscription(currentOutputTranscription.current);
           } else if (message.serverContent?.inputTranscription) {
-            currentInputTranscription.current += message.serverContent.inputTranscription.text;
+            const text = message.serverContent.inputTranscription.text;
+            currentInputTranscription.current += text;
+            setActiveInputTranscription(currentInputTranscription.current);
           }
-
+          
           if (message.serverContent?.turnComplete) {
             const userText = currentInputTranscription.current.trim();
             const modelText = currentOutputTranscription.current.trim();
 
-            if (userText) {
-              setTranscriptions((prev) => [...prev, { role: 'user', text: userText }]);
-            }
-            if (modelText) {
-              setTranscriptions((prev) => [...prev, { role: 'model', text: modelText }]);
+            if (userText || modelText) {
+              setTranscriptions((prev) => {
+                const newTranscriptions = [...prev];
+                if (userText) newTranscriptions.push({ role: 'user', text: userText });
+                if (modelText) newTranscriptions.push({ role: 'model', text: modelText });
+                return newTranscriptions;
+              });
             }
 
             currentInputTranscription.current = '';
             currentOutputTranscription.current = '';
+            setActiveInputTranscription('');
+            setActiveOutputTranscription('');
             // After user response, ask next question or end interview (handled by askQuestion itself)
             // This is handled by the model's instruction to say "I'm ready for the next question." etc.
             // The SkillCheckInterviewPage handles this flow, this component is now simpler.
@@ -115,7 +126,8 @@ const ConversationalInterview: React.FC = () => {
         },
       };
 
-      await connectToLiveSession(callbacks, []); // No tools for conversational
+      const session = await connectToLiveSession(callbacks, []); // No tools for conversational
+      liveSessionRef.current = session;
     } catch (error) {
       console.error("Error starting interview:", error);
       alert("Failed to start microphone or connect to AI. Please ensure microphone access is granted.");
@@ -141,8 +153,14 @@ const ConversationalInterview: React.FC = () => {
     if (currentQuestionIndex < CONVERSATIONAL_QUESTIONS.length) {
       const question = CONVERSATIONAL_QUESTIONS[currentQuestionIndex].text;
       setTranscriptions((prev) => [...prev, { role: 'model', text: question }]);
-      // In SkillCheckInterviewPage, the question is sent as text/plain via sendRealtimeInput.
-      // For this standalone component, we just display it. AI's audio response is handled by Live API.
+      
+      // Send the question to the live session as input for the AI to process.
+      // We need to get the session from the service or store it in a ref.
+      // Since connectToLiveSession returns the session, we should store it.
+      if (liveSessionRef.current) {
+        liveSessionRef.current.sendRealtimeInput({ text: question });
+      }
+      
       setCurrentQuestionIndex((prev) => prev + 1);
     } else {
       setTranscriptions((prev) => [...prev, { role: 'model', text: "That concludes the conversational interview. Thank you for your responses." }]);
@@ -195,17 +213,17 @@ const ConversationalInterview: React.FC = () => {
                 </span>
               </div>
             ))}
-            {isMicActive && currentInputTranscription.current && (
+            {isMicActive && activeInputTranscription && (
                 <div className="p-3 rounded-lg shadow-md max-w-[80%] bg-blue-700/50 self-end ml-auto">
                     <span className="text-blue-100">
-                        {currentInputTranscription.current}<span className="inline-block w-1 h-4 bg-blue-100 animate-pulse ml-1"></span>
+                        {activeInputTranscription}<span className="inline-block w-1 h-4 bg-blue-100 animate-pulse ml-1"></span>
                     </span>
                 </div>
             )}
-            {isMicActive && currentOutputTranscription.current && (
+            {isMicActive && activeOutputTranscription && (
                 <div className="p-3 rounded-lg shadow-md max-w-[80%] bg-emerald-700/50 self-start mr-auto">
                     <span className="text-emerald-100">
-                        {currentOutputTranscription.current}<span className="inline-block w-1 h-4 bg-emerald-100 animate-pulse ml-1"></span>
+                        {activeOutputTranscription}<span className="inline-block w-1 h-4 bg-emerald-100 animate-pulse ml-1"></span>
                     </span>
                 </div>
             )}
